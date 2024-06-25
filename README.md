@@ -6,9 +6,9 @@ The datasets are available in SMILES format to generate images.
 
 Download from https://www.kaggle.com/datasets/buildxz/dataset-label (200wan.csv)
 
-User cdk/src/main/java/GenerateBatchimage to generate the images (in dataset folder)
+Use cdk/src/main/java/GenerateBatchimage to generate the images (in dataset folder)
 
-User Binary_images to generate binary images
+Use Binary_images to generate binary images
 
 Saving binary images to "Data/PNG/"
 
@@ -31,7 +31,7 @@ Data
 
 #### Checkpoint
 
-download form: https://www.kaggle.com/datasets/buildxz/models
+download from: https://www.kaggle.com/datasets/buildxz/models
 
 #### Environment 
 
@@ -47,6 +47,12 @@ conda activate <envName>
 ```
 conda install pytorch==1.7.1 torchvision==0.8.2 cudatoolkit=10.1 -c pytorch
 pip install -r requirements.txt
+```
+
+You can also directly run the following code to configure the environment
+
+```
+bash setup.sh
 ```
 
 #### Train model
