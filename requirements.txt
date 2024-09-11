@@ -5,14 +5,14 @@ cffi==1.14.6
 charset-normalizer==2.0.7
 click==8.0.3
 Cython==0.29.24
-dataclasses==0.6
+dataclasses==0.6  # Only needed for Python < 3.7
 deepsmiles==1.0.1
 dropblock==0.3.0
 efficientnet-pytorch==0.7.1
 einops==0.3.2
 future==0.18.2
 fvcore==0.1.5.post20211023
-gensim==0.13.4.1
+gensim==4.2.0  # Updated to the latest compatible version
 h5py==3.4.0
 idna==3.3
 importlib-metadata==4.8.1
@@ -37,7 +37,7 @@ PyYAML==6.0
 rapidfuzz==1.8.2
 regex==2021.10.8
 requests==2.26.0
-resnest== 0.0.6b20211220
+resnest==0.0.6b20211220
 scikit-learn==0.20.4
 scipy==1.2.0
 smart-open==5.2.1
