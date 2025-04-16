@@ -9,7 +9,7 @@ import os
 import yaml
 from yacs.config import CfgNode as CN
 
-_C = CN()
+_C = CN(new_allowed=True)
 
 # Base config files
 _C.BASE = ['']
@@ -90,7 +90,7 @@ _C.MODEL.SWIN_MLP.PATCH_NORM = True
 # -----------------------------------------------------------------------------
 _C.TRAIN = CN()
 _C.TRAIN.START_EPOCH = 0
-_C.TRAIN.EPOCHS = 300
+_C.TRAIN.EPOCHS = 30
 _C.TRAIN.WARMUP_EPOCHS = 5
 _C.TRAIN.WEIGHT_DECAY = 0.05
 _C.TRAIN.BASE_LR = 5e-4

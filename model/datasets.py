@@ -96,7 +96,7 @@ class CaptionDataset_500wan(Dataset):
 
     def __getitem__(self, i):
         # Remember, the Nth caption corresponds to the (N // captions_per_image)th image
-        img_file = '../../Data/PNG/'+self.imgs[i]+'.png'
+        img_file = self.imgs[i]
         img = Image.open(img_file).convert('RGB')
         if self.transform is not None:
             img = self.transform(img)
@@ -146,7 +146,7 @@ class CaptionDataset_500wan_test(Dataset):
 
     def __getitem__(self, i):
         # Remember, the Nth caption corresponds to the (N // captions_per_image)th image
-        img_file = '../../Data/PNG/'+self.imgs[i]+'.png'
+        img_file = self.imgs[i]
         img = Image.open(img_file).convert('RGB')
         if self.transform is not None:
             img = self.transform(img)

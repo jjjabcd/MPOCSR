@@ -163,7 +163,7 @@ def parse_option():
                         help='no: no cache, '
                              'full: cache all data, '
                              'part: sharding the dataset into nonoverlapping pieces and only cache one piece')
-    parser.add_argument('--resume', help='resume from checkpoint')
+    parser.add_argument('--resume', type=str, default='../../ckpt/MPViT_CBLoss.pth', help='resume from checkpoint')
     parser.add_argument('--accumulation-steps', type=int, help="gradient accumulation steps")
     parser.add_argument('--use-checkpoint', action='store_true',
                         help="whether to use gradient checkpointing to save memory")
@@ -174,19 +174,28 @@ def parse_option():
     parser.add_argument('--tag', help='tag of experiment')
     parser.add_argument('--eval', action='store_true', help='Perform evaluation only')
     parser.add_argument('--throughput', action='store_true', help='Test throughput only')
+    parser.add_argument('--checkpoint_name', type=str, default='', help='checkpoint name for saving results')
 
     # distributed training
     parser.add_argument("--local_rank", type=int, required=True, help='local rank for DistributedDataParallel')
     parser.add_argument("--test_dir", default='../../Data/200wan_shuffle_test.pkl', type=str, help='direction for eval_dataset')
+    
+    parser.add_argument('--epochs', default=30, type=int, help='number of epochs to train')
+    
     args, unparsed = parser.parse_known_args()
 
     config = get_config(args)
+    
+    # config에 checkpoint_name 추가
+    config.defrost()
+    config.checkpoint_name = args.checkpoint_name
+    config.freeze()
 
     return args, config
 
 
 def main(config) :
-    dir = '../../Data/200wan_shuffle'
+    dir = '../../Data/Drug_like/ocsaug/ocsaug'
     global best_acc, epochs_since_improvement, checkpoint, start_epoch, fine_tune_encoder, word_map
     word_map_file = '../../Data/200w_word_map.pth'
     word_map = torch.load(word_map_file)
@@ -264,8 +273,21 @@ def main(config) :
         throughput(data_loader_val, encoder, logger)
         return
     if config.EVAL_MODE:
-        Swin_Evaluate(config.MODEL.RESUME.split('/')[-1], 1, encoder_without_ddp, decoder_without_ddp, config.TEST_DIR)
+        Swin_Evaluate(
+            config.MODEL.RESUME.split('/')[-1], 
+            1, 
+            encoder_without_ddp, 
+            decoder_without_ddp, 
+            config.TEST_DIR, 
+            save_path=config.OUTPUT,
+            checkpoint_name=config.checkpoint_name
+        )
         return
+    
+    config.defrost()
+    config.TRAIN.START_EPOCH = 0
+    config.freeze()
+    
     logger.info("Start training")
     start_time = time.time()
 
@@ -441,6 +463,10 @@ def train_one_epoch(config, encoder, encoder_optimizer, decoder, decoder_optimiz
                                                                                 top5=top5accs))
     epoch_time = time.time() - start
     logger.info(f"EPOCH {epoch} training takes {datetime.timedelta(seconds=int(epoch_time))}")
+
+    # 매 반복마다 메모리 정리
+    del loss
+    torch.cuda.empty_cache()
 
 
 @torch.no_grad()
@@ -751,8 +777,18 @@ def test(encoder,  decoder, criterion, test_loader):
 
     return bleu4
 
+def load_checkpoint(config, encoder, encoder_optimizer, decoder, decoder_optimizer, encoder_lr_scheduler, decoder_lr_scheduler, logger):
+    logger.info(f"==============> Resuming form {config.MODEL.RESUME}....................")
+    checkpoint = torch.load(config.MODEL.RESUME, map_location='cpu')
+    msg = encoder.load_state_dict(checkpoint['encoder'], strict=False)
+    msg = decoder.load_state_dict(checkpoint['decoder'], strict=False)
+    logger.info(f"=> loaded successfully '{config.MODEL.RESUME}'")
+    del checkpoint
+    torch.cuda.empty_cache()
+    return 0.0, 0.0
+
 if __name__ == '__main__':
-    _, config = parse_option()
+    args, config = parse_option()
 
     if config.AMP_OPT_LEVEL != "O0":
         assert amp is not None, "amp not installed!"
@@ -769,7 +805,10 @@ if __name__ == '__main__':
     # config.freeze()
     config.defrost()
     config.MODEL.NAME = 'MPViT_CBloss'
-    config.OUTPUT = os.path.join('output', config.MODEL.NAME, config.TAG)
+    if args.output:
+        config.OUTPUT = args.output
+    else:
+        config.OUTPUT = os.path.join('output', config.MODEL.NAME, args.tag if args.tag else 'default')
     config.freeze()
     torch.cuda.set_device(config.LOCAL_RANK)
     torch.distributed.init_process_group(backend='gloo', init_method='env://', world_size=world_size, rank=rank)

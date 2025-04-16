@@ -17,8 +17,7 @@ import deepsmiles
 import numpy as np
 import pandas as pd
 from pycocoevalcap.rouge.rouge import Rouge
-error_file_ids = "./_test_error.txt"
-hypethese_file ="./_test_hypethese.txt"
+import os
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  # sets device for model and PyTorch tensors
 cudnn.benchmark = True  # set to true only if inputs to model are fixed size; otherwise lot of computational overhead
@@ -49,39 +48,42 @@ def acc(pred_data,test_data):
             notin_count+=1
     return count/sum_count*1.0,error_ids
 
-def save_to_file(filename,references, data,word_dic,truth=False):
+def save_to_file(filename, references, data, word_dic, truth=False):
+    df = pd.DataFrame(columns=['true_smiles', 'pred_smiles'])
     converter = deepsmiles.Converter(rings=True, branches=True)
-    ture_f = open('ture.txt','w', encoding='utf-8')
-    pre_f = open('pre.txt','w',encoding='utf-8')
-    # pre_f.write('Smiles'+'\n')
-    # ture_f.write('Smiles'+'\n')
     all_count = len(data)
     count = 0
+    
+    true_smiles_list = []
+    pred_smiles_list = []
+    
     for i in range(all_count):
         true_ids = references[i][0]
         ids = data[i]
         if truth:
             ids = [id for id in ids if word_dic[id]!='<start>' and word_dic[id]!='<pad>' and word_dic[id]!='<end>']
+        
         smiles = [rev_word_map[id] for id in ids if id !=word_map['<end>']]
-        true_smiles = [rev_word_map[id]  for id in true_ids if id !=word_map['<end>']]
+        true_smiles = [rev_word_map[id] for id in true_ids if id !=word_map['<end>']]
+        
         smiles = ''.join(smiles)
         true_smiles = ''.join(true_smiles)
+        
         try:
-            # decoded = converter.decode(smiles)
             count += 1
-            # pre_f.write(decoded+'\n')
-            pre_f.write(smiles + '\n')
+            pred_smiles_list.append(smiles)
+            true_smiles_list.append(true_smiles)
         except:
             print('error')
             continue
-        try:
-            # decoded = converter.decode(true_smiles)
-            # ture_f.write(decoded + '\n')
-            ture_f.write(true_smiles + '\n')
-        except:
-            print('error')
-    ture_f.close()
-    pre_f.close()
+    
+    # DataFrame에 데이터 추가
+    df['true_smiles'] = true_smiles_list
+    df['pred_smiles'] = pred_smiles_list
+    
+    # CSV 파일로 저장
+    df.to_csv(filename, index=False, encoding='utf-8')
+    
     return count/all_count*1.0
 
 
@@ -135,12 +137,14 @@ def beam_search (batch_size,Decoder, beam_size, max_seq_len,src_pad_idx, trg_pad
     return translator
 
 
-def swin_evaluate(beam_size, encoder, decoder,test_dir):
+def swin_evaluate(beam_size, encoder, decoder, test_dir, save_path="./", checkpoint_name=""):
     """
-    Evaluation
-    :param beam_size: beam size at which to generate captions for evaluation
-    :return: BLEU-4 score
+    :param checkpoint_name: 체크포인트 이름 (파일명 구분용)
     """
+    # 파일 경로에 체크포인트 이름 추가
+    error_file_ids = os.path.join(save_path, f"{checkpoint_name}_test_error.txt")
+    hypethese_file = os.path.join(save_path, f"{checkpoint_name}_predictions.csv")
+    
     encoder = encoder.to(device)
     encoder.eval()
     decoder = decoder.to(device)
@@ -247,18 +251,28 @@ def swin_evaluate(beam_size, encoder, decoder,test_dir):
     scorer = Rouge()
     rouge_score, scores = scorer.compute_score(gts, res)
 
-    with open(error_file_ids, 'w', encoding='utf-8') as error_ids_f:  # =============
+    with open(error_file_ids, 'w', encoding='utf-8') as error_ids_f:
         error_ids_f.write(' '.join([str(id + 1) for id in error_ids]))
     return bleu1, bleu2, bleu3, bleu4, bleu_avg, acc_score, valid, rouge_score
 
 
-def Swin_Evaluate(model_name,beam,encoder,decoder,test_dir):
-    log_file = open(f"./test_result_beam_{beam}.log","a")
-    bleu1,bleu2,bleu3,bleu4,bleu_avg, acc_score_1, valid, rouge_score = swin_evaluate(beam, encoder=encoder, decoder=decoder,test_dir=test_dir)
+def Swin_Evaluate(model_name, beam, encoder, decoder, test_dir, save_path="./", checkpoint_name=""):
+    # checkpoint_name 인자 추가
+    log_file = open(os.path.join(save_path, f"{checkpoint_name}_test_result_beam_{beam}.log"), "a")
+    
+    bleu1, bleu2, bleu3, bleu4, bleu_avg, acc_score_1, valid, rouge_score = swin_evaluate(
+        beam, 
+        encoder=encoder, 
+        decoder=decoder,
+        test_dir=test_dir,
+        save_path=save_path,
+        checkpoint_name=checkpoint_name  # checkpoint_name 전달
+    )
 
     print("\nbefore_transformer_result_bs_16_embedding_16 N_6 H_8 BLEU score @ beam size %d is %.4f %.4f %.4f %.4f. avg: %.4f. acc %.4f. valid: %.4f rouge_score:%.4f" %
         (1, bleu1, bleu2, bleu3, bleu4,bleu_avg, acc_score_1, valid, rouge_score))
     log_file.write("\n%s BLEU score @ beam size %d is %.4f %.4f %.4f %.4f. avg: %.4f. acc %.4f. Valid: %.4f rouge_score:%.4f" % (model_name, beam, bleu1, bleu2, bleu3, bleu4,bleu_avg, acc_score_1, valid, rouge_score))
+
 if __name__ == '__main__':
     log_file = open("./test_result.log","a")
     bleu1,bleu2,bleu3,bleu4,bleu_avg, acc_score_1 = evaluate(1)
